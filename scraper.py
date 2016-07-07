@@ -47,7 +47,8 @@ async def scrape_person(session, semaphore, params):
     async with semaphore, session.get(base_url, params=params) as resp:
         source, = (parse_html(await resp.text())
                    .xpath('//div[@class = "art-article"]'))
-        return (source.text_content().strip().splitlines()[0].strip(),
+        return (params['id'],
+                source.text_content().strip().splitlines()[0].strip(),
                 extract_photo(),
                 extract_other_item('FILIACIÓN POLÍTICA:'),
                 deobfuscate_email(),
@@ -79,10 +80,10 @@ def main():
     with sqlite3.connect('data.sqlite') as cursor:
         cursor.execute('''\
 CREATE TABLE IF NOT EXISTS data
-(name, image, 'group', email, phone, website, facebook, twitter, place_of_birth,
- source, UNIQUE (source))''')
+(id, name, image, 'group', email, phone, website, facebook, twitter,
+ place_of_birth, source, UNIQUE (id))''')
         cursor.executemany('''\
-INSERT OR REPLACE INTO data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', people)
+INSERT OR REPLACE INTO data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', people)
 
 if __name__ == '__main__':
     main()

@@ -2,7 +2,7 @@
 import asyncio
 import re
 import sqlite3
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlquote
 import sys
 
 import aiohttp
@@ -21,7 +21,7 @@ async def scrape_person(session, semaphore, params):
             photo, = source.xpath('.//img[1]/@src')
         except ValueError:
             return
-        return urljoin(base_url, photo)
+        return urljoin(base_url, urlquote(photo))
 
     def deobfuscate_email():
         email = unparse_html(source).decode()

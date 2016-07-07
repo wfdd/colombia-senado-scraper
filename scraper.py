@@ -39,8 +39,8 @@ async def scrape_person(session, semaphore, params):
                                     '/following-sibling::td/text()'
                                     ).format(caption))).strip()
         if caption == 'TWITTER:':
-            val = val.lstrip('@')
-        if not val or val.lower() == 'no tiene':
+            val = val.lstrip('@').replace('https://twitter.com/', '')
+        if not val or val.lower() in {'no tine', 'no tiene'}:
             return
         return val
 

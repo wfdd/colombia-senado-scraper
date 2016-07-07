@@ -2,7 +2,7 @@
 import asyncio
 import re
 import sqlite3
-from urllib.parse import urljoin, urlquote
+from urllib.parse import urljoin, quote as urlquote
 import sys
 
 import aiohttp

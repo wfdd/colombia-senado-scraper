@@ -30,7 +30,7 @@ async def scrape_person(session, semaphore, params):
         emails = [deobfuscate_email(m.groups())
                   for m in email_match.finditer(emails)]
         if not emails:
-            return print("Couldn't find email in " + repr(resp.url),
+            return print("Couldn't find email in " + profile_resp.url,
                          file=sys.stderr)
         return next((e for e in emails if 'senado.gov.co' in e), emails[0])
 
@@ -41,44 +41,66 @@ async def scrape_person(session, semaphore, params):
             return
         return urljoin(base_url, urlquote(photo))
 
-    def extract_other_item(caption):
+    def extract_other_item(caption, link=False):
         if isinstance(caption, tuple):
-            return next(filter(None, map(extract_other_item, caption)),
+            return next(filter(None, (extract_other_item(i, link) for i in caption)),
                         None)
-        val = ''.join(source.xpath(('string(.//td[contains(string(.), "{}")]'
-                                    '/following-sibling::td)'
-                                    ).format(caption))).strip()
-        if caption == 'TWITTER:':
-            val = val.lstrip('@').replace('https://twitter.com/', '')
-        if not val or val.lower() in {'no tine', 'no tiene'}:
-            return
+        if link:
+            return next(iter(source.xpath('''\
+.//td[contains(string(.), "{}")]/following-sibling::td//a/@href'''.format(
+                caption))), None)
+        else:
+            val = ''.join(source.xpath('''\
+string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
+                caption))).strip()
+            if not val or val.lower() in {'no tine', 'no tiene'}:
+                return
         return val
 
+    def extract_facebook():
+        facebook = (extract_other_item('FACEBOOK:', link=True) or
+                    extract_other_item('FACEBOOK:'))
+        if not facebook:
+            return
+
+        if facebook.startswith(('facebook.com', '/facebook.com')):
+            facebook = 'https://www.' + facebook.lstrip('/')
+        elif facebook.startswith('http://social.facebook.com/'):
+            facebook = facebook.replace('http://social.facebook.com/',
+                                        'https://www.facebook.com/')
+        elif not facebook.startswith('http'):
+            facebook = urljoin('https://www.facebook.com/', facebook)
+        return facebook
+
+    def extract_twitter():
+        twitter = extract_other_item('TWITTER:')
+        if twitter:
+            twitter = twitter.lstrip('@').replace('https://twitter.com/', '')
+        return twitter
+
     async def extract_website():
-        try:
-            website, = source.xpath('''\
-.//td[contains(string(.), "PAGINA WEB:") or
-      contains(string(.), "PÁGINA WEB:")]/following-sibling::td//a/@href''')
-        except ValueError:
+        website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'), link=True)
+        if not website or 'alvaroasthongiraldo' in website:
             website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'))
             if not website:
                 return
             if not website.startswith('http'):
                 website = ('http://' + website).rstrip(',')
-        else:
-            if website == '/false' or 'mailto:' in website:
+        elif website == '/false' or 'mailto:' in website:
                 return
         try:
             with aiohttp.Timeout(5):
-                async with session.head(website) as resp:
-                    return resp.url
+                async with session.head(website) as website_resp:
+                    return website_resp.url
         except aiohttp.errors.ClientError:
-            print(repr(website) + ' was not found', file=sys.stderr)
+            print(repr(website) + ' was not found while parsing ' +
+                  profile_resp.url, file=sys.stderr)
         except asyncio.TimeoutError:
-            print(repr(website) + ' is unresponsive', file=sys.stderr)
+            print(repr(website) + ' is unresponsive while parsing ' +
+                  profile_resp.url, file=sys.stderr)
 
-    async with semaphore, session.get(base_url, params=params) as resp:
-        source, = (parse_html(await resp.text())
+    async with semaphore, session.get(base_url, params=params) as profile_resp:
+        source, = (parse_html(await profile_resp.text())
                    .xpath('//div[@class = "art-article"]'))
     return (params['id'],
             source.text_content().strip().splitlines()[0].strip(),
@@ -86,9 +108,11 @@ async def scrape_person(session, semaphore, params):
             extract_other_item('FILIACIÓN POLÍTICA:'),
             extract_email(),
             (await extract_website()),
-            *map(extract_other_item,
-                 ('TELÉFONO:', 'FACEBOOK:', 'TWITTER:', 'LUGAR DE NACIMIENTO:')),
-            resp.url)
+            extract_other_item('TELÉFONO:'),
+            extract_facebook(),
+            extract_twitter(),
+            extract_other_item('LUGAR DE NACIMIENTO:'),
+            profile_resp.url)
 
 
 async def gather_people(session, semaphore):

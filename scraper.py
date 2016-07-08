@@ -106,6 +106,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
             source.text_content().strip().splitlines()[0].strip(),
             extract_photo(),
             extract_other_item('FILIACIÓN POLÍTICA:'),
+            '2014',
             extract_email(),
             (await extract_website()),
             extract_other_item('TELÉFONO:'),
@@ -137,10 +138,11 @@ def main():
     with sqlite3.connect('data.sqlite') as cursor:
         cursor.execute('''\
 CREATE TABLE IF NOT EXISTS data
-(id, name, image, 'group', email, website, phone, facebook, twitter,
+(id, name, image, 'group', term, email, website, phone, facebook, twitter,
  place_of_birth, source, UNIQUE (id))''')
         cursor.executemany('''\
-INSERT OR REPLACE INTO data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', people)
+INSERT OR REPLACE INTO data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            people)
 
 if __name__ == '__main__':
     main()

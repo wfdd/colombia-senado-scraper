@@ -73,9 +73,9 @@ async def scrape_person(session, semaphore, params):
                 async with session.head(website) as resp:
                     return resp.url
         except aiohttp.errors.ClientError:
-            return print(repr(website) + ' was not found', file=sys.stderr)
+            print(repr(website) + ' was not found', file=sys.stderr)
         except asyncio.TimeoutError:
-            return print(repr(website) + ' is unresponsive', file=sys.stderr)
+            print(repr(website) + ' is unresponsive', file=sys.stderr)
 
     async with semaphore, session.get(base_url, params=params) as resp:
         source, = (parse_html(await resp.text())

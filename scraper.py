@@ -70,10 +70,10 @@ async def scrape_person(session, semaphore, params):
                 return
         try:
             with aiohttp.Timeout(5):
-                (await session.head(website)).close()
+                async with session.head(website) as resp:
+                    return resp.url
         except aiohttp.errors.ClientError:
             return print(repr(website) + ' is unresponsive', file=sys.stderr)
-        return website
 
     async with semaphore, session.get(base_url, params=params) as resp:
         source, = (parse_html(await resp.text())

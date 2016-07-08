@@ -42,8 +42,11 @@ async def scrape_person(session, semaphore, params):
         return urljoin(base_url, urlquote(photo))
 
     def extract_other_item(caption):
-        val = ''.join(source.xpath(('.//td[contains(string(.), "{}")]'
-                                    '/following-sibling::td/text()'
+        if isinstance(caption, tuple):
+            return next(filter(None, map(extract_other_item, caption)),
+                        None)
+        val = ''.join(source.xpath(('string(.//td[contains(string(.), "{}")]'
+                                    '/following-sibling::td)'
                                     ).format(caption))).strip()
         if caption == 'TWITTER:':
             val = val.lstrip('@').replace('https://twitter.com/', '')
@@ -51,18 +54,39 @@ async def scrape_person(session, semaphore, params):
             return
         return val
 
+    async def extract_website():
+        try:
+            website, = source.xpath('''\
+.//td[contains(string(.), "PAGINA WEB:") or
+      contains(string(.), "PÁGINA WEB:")]/following-sibling::td//a/@href''')
+        except ValueError:
+            website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'))
+            if not website:
+                return
+            if not website.startswith('http'):
+                website = ('http://' + website).rstrip(',')
+        else:
+            if website == '/false' or 'mailto:' in website:
+                return
+        try:
+            with aiohttp.Timeout(5):
+                (await session.head(website)).close()
+        except aiohttp.errors.ClientError:
+            return print(repr(website) + ' is unresponsive', file=sys.stderr)
+        return website
+
     async with semaphore, session.get(base_url, params=params) as resp:
         source, = (parse_html(await resp.text())
                    .xpath('//div[@class = "art-article"]'))
-        return (params['id'],
-                source.text_content().strip().splitlines()[0].strip(),
-                extract_photo(),
-                extract_other_item('FILIACIÓN POLÍTICA:'),
-                extract_email(),
-                *map(extract_other_item,
-                     ('TELÉFONO:', 'PÁGINA WEB:', 'FACEBOOK:', 'TWITTER:',
-                      'LUGAR DE NACIMIENTO:')),
-                resp.url)
+    return (params['id'],
+            source.text_content().strip().splitlines()[0].strip(),
+            extract_photo(),
+            extract_other_item('FILIACIÓN POLÍTICA:'),
+            extract_email(),
+            (await extract_website()),
+            *map(extract_other_item,
+                 ('TELÉFONO:', 'FACEBOOK:', 'TWITTER:', 'LUGAR DE NACIMIENTO:')),
+            resp.url)
 
 
 async def gather_people(session, semaphore):
@@ -87,7 +111,7 @@ def main():
     with sqlite3.connect('data.sqlite') as cursor:
         cursor.execute('''\
 CREATE TABLE IF NOT EXISTS data
-(id, name, image, 'group', email, phone, website, facebook, twitter,
+(id, name, image, 'group', email, website, phone, facebook, twitter,
  place_of_birth, source, UNIQUE (id))''')
         cursor.executemany('''\
 INSERT OR REPLACE INTO data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', people)

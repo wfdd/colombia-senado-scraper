@@ -1,4 +1,5 @@
 
+import ast
 import asyncio
 import re
 import sqlite3
@@ -15,24 +16,30 @@ numeric_escape_match = re.compile(r'&#(\d+);')
 email_match = re.compile(r'\n var addy\d+ = (.*);\n addy\d+ = addy\d+ \+ (.*);')
 
 
+def deobfuscate_email(matches):
+    email = ''.join(ast.literal_eval(i.strip())
+                    for m in matches
+                    for i in m.split('+'))
+    email = numeric_escape_match.sub(lambda m: chr(int(m.group(1))), email)
+    return email
+
+
 async def scrape_person(session, semaphore, params):
+    def extract_email():
+        emails = unparse_html(source).decode()
+        emails = [deobfuscate_email(m.groups())
+                  for m in email_match.finditer(emails)]
+        if not emails:
+            return print("Couldn't find email in " + repr(resp.url),
+                         file=sys.stderr)
+        return next((e for e in emails if 'senado.gov.co' in e), emails[0])
+
     def extract_photo():
         try:
             photo, = source.xpath('.//img[1]/@src')
         except ValueError:
             return
         return urljoin(base_url, urlquote(photo))
-
-    def deobfuscate_email():
-        email = unparse_html(source).decode()
-        try:
-            email = next(email_match.finditer(email)).groups()
-        except StopIteration:
-            return print("Couldn't find email in " + repr(resp.url),
-                         file=sys.stderr)
-        email = ''.join(eval(m) for m in email)
-        email = numeric_escape_match.sub(lambda m: chr(int(m.group(1))), email)
-        return email
 
     def extract_other_item(caption):
         val = ''.join(source.xpath(('.//td[contains(string(.), "{}")]'
@@ -51,7 +58,7 @@ async def scrape_person(session, semaphore, params):
                 source.text_content().strip().splitlines()[0].strip(),
                 extract_photo(),
                 extract_other_item('FILIACIÓN POLÍTICA:'),
-                deobfuscate_email(),
+                extract_email(),
                 *map(extract_other_item,
                      ('TELÉFONO:', 'PÁGINA WEB:', 'FACEBOOK:', 'TWITTER:',
                       'LUGAR DE NACIMIENTO:')),

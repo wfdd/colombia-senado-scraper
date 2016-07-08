@@ -1,3 +1,4 @@
-aiohttp==0.21.6
+aiohttp==0.22.0a0
 chardet==2.3.0
 lxml==3.6.0
+multidict==1.1.0

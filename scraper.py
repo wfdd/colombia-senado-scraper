@@ -39,13 +39,13 @@ async def scrape_person(session, semaphore, params):
             photo, = source.xpath('.//img[1]/@src')
         except ValueError:
             return
-        async with session.head(urljoin(base_url, urlquote(photo))) as photo_resp:
+        async with semaphore, \
+                session.head(urljoin(base_url, urlquote(photo))) as photo_resp:
             if photo_resp.status == 200:
                 return photo_resp.url
         print('Discarding photo {} in {}; received error code {}'
               .format(photo_resp.url, profile_resp.url, photo_resp.status),
               file=sys.stderr)
-
 
     def extract_other_item(caption, link=False):
         if isinstance(caption, tuple):

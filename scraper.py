@@ -34,12 +34,18 @@ async def scrape_person(session, semaphore, params):
                          file=sys.stderr)
         return next((e for e in emails if 'senado.gov.co' in e), emails[0])
 
-    def extract_photo():
+    async def extract_photo():
         try:
             photo, = source.xpath('.//img[1]/@src')
         except ValueError:
             return
-        return urljoin(base_url, urlquote(photo))
+        async with session.head(urljoin(base_url, urlquote(photo))) as photo_resp:
+            if photo_resp.status == 200:
+                return photo_resp.url
+        print('Discarding photo {} in {}; received error code {}'
+              .format(photo_resp.url, profile_resp.url, photo_resp.status),
+              file=sys.stderr)
+
 
     def extract_other_item(caption, link=False):
         if isinstance(caption, tuple):
@@ -93,18 +99,18 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
                 async with session.head(website) as website_resp:
                     return website_resp.url
         except aiohttp.errors.ClientError:
-            print(repr(website) + ' was not found while parsing ' +
-                  profile_resp.url, file=sys.stderr)
+            print(website + ' was not found while parsing ' + profile_resp.url,
+                  file=sys.stderr)
         except asyncio.TimeoutError:
-            print(repr(website) + ' is unresponsive while parsing ' +
-                  profile_resp.url, file=sys.stderr)
+            print(website + ' was unresponsive while parsing ' + profile_resp.url,
+                  file=sys.stderr)
 
     async with semaphore, session.get(base_url, params=params) as profile_resp:
         source, = (parse_html(await profile_resp.text())
                    .xpath('//div[@class = "art-article"]'))
     return (params['id'],
             source.text_content().strip().splitlines()[0].strip(),
-            extract_photo(),
+            (await extract_photo()),
             extract_other_item('FILIACIÓN POLÍTICA:'),
             '2014',
             extract_email(),

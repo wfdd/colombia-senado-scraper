@@ -105,7 +105,8 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
             print(website + ' was unresponsive while parsing ' + profile_resp.url,
                   file=sys.stderr)
 
-    async with semaphore, session.get(base_url, params=params) as profile_resp:
+    async with semaphore, session.get(base_url, params=sorted(params.items())) \
+            as profile_resp:
         source, = (parse_html(await profile_resp.text())
                    .xpath('//div[@class = "art-article"]'))
     return (params['id'],

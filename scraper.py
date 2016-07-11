@@ -33,14 +33,14 @@ def deobfuscate_email(matches):
 
 
 async def scrape_person(session, semaphore, params):
-    def extract_email():
+    def extract_emails():
         emails = unparse_html(source).decode()
         emails = [deobfuscate_email(m.groups())
                   for m in email_match.finditer(emails)]
         if not emails:
-            return print("Couldn't find email in " + profile_resp.url,
-                         file=sys.stderr)
-        return next((e for e in emails if 'senado.gov.co' in e), emails[0])
+            _log("Couldn't find email in " + profile_resp.url)
+            return
+        return ';'.join(sorted(emails, key=lambda i: 'senado.gov.co' in i))
 
     async def extract_photo():
         try:
@@ -122,7 +122,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
             (await extract_photo()),
             extract_other_item('FILIACIÓN POLÍTICA:'),
             '2014',
-            extract_email(),
+            extract_emails(),
             (await extract_website()),
             extract_other_item('TELÉFONO:'),
             extract_facebook(),

@@ -5,7 +5,7 @@ import inspect
 import re
 import sqlite3
 import sys
-from textwrap import wrap
+from textwrap import TextWrapper
 from urllib.parse import urljoin, quote as urlquote
 
 import aiohttp
@@ -21,10 +21,11 @@ email_match = re.compile(r'\n var addy\d+ = (.*);\n addy\d+ = addy\d+ \+ (.*);')
 loop = uvloop.new_event_loop()
 
 
-def _log(message):
-    print('\n'.join([inspect.stack()[1].function] +
-                     wrap(message, break_long_words=False, break_on_hyphens=False,
-                          subsequent_indent='  ')), file=sys.stderr)
+def _log(message, _wrap=TextWrapper(break_long_words=False, break_on_hyphens=False,
+                                    width=68).wrap):
+    print('\n'.join((inspect.stack()[1].function,
+                     *('  ' + m for m in _wrap(message)))
+                    ), file=sys.stderr)
 
 
 def deobfuscate_email(matches):
@@ -56,7 +57,7 @@ async def scrape_person(session, semaphore, params):
                 session.head(urljoin(base_url, urlquote(photo))) as photo_resp:
             if photo_resp.status == 200:
                 return photo_resp.url
-        _log('Discarding {} in {}: received error code {}'
+        _log('Discarding {} in {}.  Received error code {}'
              .format(photo_resp.url, profile_resp.url, photo_resp.status))
 
     def extract_other_item(caption, link=False):
@@ -111,11 +112,11 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
                 async with session.head(website) as website_resp:
                     ...
         except aiohttp.errors.ClientError as e:
-            _log('Discarding {} in {}: {}'
+            _log('Discarding {} in {}.  {}'
                  .format(website, profile_resp.url, e.args[1]))
             return
         except asyncio.TimeoutError as e:
-            _log('{} was unresponsive in {}: {}'.format(e.args[1]))
+            _log('{} was unresponsive in {}.  {}'.format(e.args[1]))
         return website_resp.url
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \

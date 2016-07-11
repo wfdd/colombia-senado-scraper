@@ -29,6 +29,7 @@ def deobfuscate_email(matches):
                     for m in matches
                     for i in m.split('+'))
     email = numeric_escape_match.sub(lambda m: chr(int(m.group(1))), email)
+    email = email.strip('-')
     return email
 
 
@@ -40,7 +41,8 @@ async def scrape_person(session, semaphore, params):
         if not emails:
             _log("Couldn't find email in " + profile_resp.url)
             return
-        return ';'.join(sorted(emails, key=lambda i: 'senado.gov.co' in i))
+        return ';'.join(sorted(emails,
+                               key=lambda i: 0 if 'senado.gov.co' in i else 1))
 
     async def extract_photo():
         try:

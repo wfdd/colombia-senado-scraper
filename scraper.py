@@ -110,14 +110,14 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
         try:
             with aiohttp.Timeout(5, loop=loop):
                 async with session.head(website) as website_resp:
-                    ...
+                    return website_resp.url
         except aiohttp.errors.ClientError as e:
             _log('Discarding {} in {}.  {}'
                  .format(website, profile_resp.url, e.args[1]))
             return
         except asyncio.TimeoutError as e:
-            _log('{} was unresponsive in {}.  {}'.format(e.args[1]))
-        return website_resp.url
+            _log('{} was unresponsive in {}.')
+            return website
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \
             as profile_resp:

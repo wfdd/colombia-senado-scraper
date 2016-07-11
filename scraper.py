@@ -88,7 +88,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
     def extract_twitter():
         twitter = extract_other_item('TWITTER:')
         if twitter:
-            twitter = twitter.lstrip('@').replace('https://twitter.com/', '')
+            twitter = twitter.replace('https://twitter.com/', '').lstrip('@')
         return twitter
 
     async def extract_website():
@@ -134,7 +134,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
 async def gather_people(session, semaphore):
     async with session.get(base_url + 'index.php/buscar-senador') as resp:
         source = parse_html(await resp.text())
-    base_params = dict((*i.xpath('./@name'), *i.xpath('./@value'))
+    base_params = dict(i.xpath('./@name | ./@value')
                        for i in source.xpath('//form[@name = "ddaForm"]'
                                              '/input[@type = "hidden"]'))
     people_ids = source.xpath('//form[@name = "ddaForm"]/select[@name = "id"]'

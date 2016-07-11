@@ -1,10 +1,12 @@
 
 import ast
 import asyncio
+import inspect
 import re
 import sqlite3
-from urllib.parse import urljoin, quote as urlquote
 import sys
+from textwrap import wrap
+from urllib.parse import urljoin, quote as urlquote
 
 import aiohttp
 from lxml.html import (document_fromstring as parse_html,
@@ -14,6 +16,12 @@ base_url = 'http://www.secretariasenado.gov.co/'
 
 numeric_escape_match = re.compile(r'&#(\d+);')
 email_match = re.compile(r'\n var addy\d+ = (.*);\n addy\d+ = addy\d+ \+ (.*);')
+
+
+def _log(message):
+    print('\n'.join([inspect.stack()[1].function] +
+                     wrap(message, break_long_words=False, break_on_hyphens=False,
+                          subsequent_indent='  ')), file=sys.stderr)
 
 
 def deobfuscate_email(matches):
@@ -43,9 +51,8 @@ async def scrape_person(session, semaphore, params):
                 session.head(urljoin(base_url, urlquote(photo))) as photo_resp:
             if photo_resp.status == 200:
                 return photo_resp.url
-        print('Discarding photo {} in {}; received error code {}'
-              .format(photo_resp.url, profile_resp.url, photo_resp.status),
-              file=sys.stderr)
+        _log('Discarding {} in {}: received error code {}'
+             .format(photo_resp.url, profile_resp.url, photo_resp.status))
 
     def extract_other_item(caption, link=False):
         if isinstance(caption, tuple):
@@ -97,13 +104,14 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
         try:
             with aiohttp.Timeout(5):
                 async with session.head(website) as website_resp:
-                    return website_resp.url
-        except aiohttp.errors.ClientError:
-            print(website + ' was not found while parsing ' + profile_resp.url,
-                  file=sys.stderr)
-        except asyncio.TimeoutError:
-            print(website + ' was unresponsive while parsing ' + profile_resp.url,
-                  file=sys.stderr)
+                    ...
+        except aiohttp.errors.ClientError as e:
+            _log('Discarding {} in {}: {}'
+                 .format(website, profile_resp.url, e.args[1]))
+            return
+        except asyncio.TimeoutError as e:
+            _log('{} was unresponsive in {}: {}'.format(e.args[1]))
+        return website_resp.url
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \
             as profile_resp:

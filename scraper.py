@@ -11,11 +11,14 @@ from urllib.parse import urljoin, quote as urlquote
 import aiohttp
 from lxml.html import (document_fromstring as parse_html,
                        tostring as unparse_html)
+import uvloop
 
 base_url = 'http://www.secretariasenado.gov.co/'
 
 numeric_escape_match = re.compile(r'&#(\d+);')
 email_match = re.compile(r'\n var addy\d+ = (.*);\n addy\d+ = addy\d+ \+ (.*);')
+
+loop = uvloop.new_event_loop()
 
 
 def _log(message):
@@ -104,7 +107,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
         elif website == '/false' or 'mailto:' in website:
                 return
         try:
-            with aiohttp.Timeout(5):
+            with aiohttp.Timeout(5, loop=loop):
                 async with session.head(website) as website_resp:
                     ...
         except aiohttp.errors.ClientError as e:
@@ -143,16 +146,15 @@ async def gather_people(session, semaphore):
                               '/option[position() > 1]/@value')
     people = await asyncio.gather(*(scrape_person(session, semaphore,
                                                   {**base_params, 'id': i})
-                                    for i in people_ids))
+                                    for i in people_ids), loop=loop)
     return people
 
 
 def main():
-    loop = asyncio.get_event_loop()
-    with aiohttp.ClientSession(loop=loop) as session:
-        people = loop.run_until_complete(gather_people(session,
-                                                       asyncio.Semaphore(10)))
-    with sqlite3.connect('data.sqlite') as cursor:
+    with aiohttp.ClientSession(loop=loop) as session, \
+            sqlite3.connect('data.sqlite') as cursor:
+        people = loop.run_until_complete(gather_people(
+            session, asyncio.Semaphore(10, loop=loop)))
         cursor.execute('''\
 CREATE TABLE IF NOT EXISTS data
 (id, name, image, 'group', term, email, website, phone, facebook, twitter,

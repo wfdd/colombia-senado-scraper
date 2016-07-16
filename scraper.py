@@ -116,7 +116,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
                  .format(website, profile_resp.url, e.args[1]))
             return
         except asyncio.TimeoutError as e:
-            _log('{} was unresponsive in {}.')
+            _log('{} was unresponsive in {}.'.format(website, profile_resp.url))
             return website
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \

@@ -65,7 +65,7 @@ async def scrape_person(session, semaphore, params):
             return next(filter(None, (extract_other_item(i, link) for i in caption)),
                         None)
         if link:
-            return next(iter(source.xpath('''\
+            val = next(iter(source.xpath('''\
 .//td[contains(string(.), "{}")]/following-sibling::td//a/@href'''.format(
                 caption))), None)
         else:
@@ -99,7 +99,10 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
 
     async def extract_website():
         website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'), link=True)
-        if not website or 'alvaroasthongiraldo' in website:
+        if not website or (
+                # The `href` attribute is set to 'alvaroasthongiraldo' for
+                # several others
+                'alvaroasthongiraldo' in website):
             website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'))
             if not website:
                 return
@@ -107,17 +110,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
                 website = ('http://' + website).rstrip(',')
         elif website == '/false' or 'mailto:' in website:
                 return
-        try:
-            with aiohttp.Timeout(5, loop=loop):
-                async with session.head(website) as website_resp:
-                    return website_resp.url
-        except aiohttp.errors.ClientError as e:
-            _log('Discarding {} in {}.  {}'
-                 .format(website, profile_resp.url, e.args[1]))
-            return
-        except asyncio.TimeoutError as e:
-            _log('{} was unresponsive in {}.'.format(website, profile_resp.url))
-            return website
+        return website
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \
             as profile_resp:

@@ -1,5 +1,7 @@
-aiohttp==0.22.0a0
+aiohttp==1.1.4
+async-timeout==1.1.0
 chardet==2.3.0
-lxml==3.6.0
-multidict==1.1.0
-uvloop==0.4.33
+lxml==3.6.4
+multidict==2.1.2
+uvloop==0.6.5
+yarl==0.7.0

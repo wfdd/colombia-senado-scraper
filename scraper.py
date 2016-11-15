@@ -98,16 +98,13 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
 
     def extract_website():
         website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'), link=True)
-        if website:
-            website = ';'.join(w for w in website
-                               if not (w == '/false' or 'mailto:' in w or 
-                                       'alvaroasthongiraldo' in w))
-        else:
+        website = ';'.join(w for w in website
+                           if not (w == '/false' or 'mailto:' in w or 
+                                   'alvaroasthongiraldo' in w))
+        if not website:
             website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'))
-            if not website:
-                return
             website = ';'.join((w if w.startswith('http') else 'http://' + w
-                               ).rstrip(',') for w in website.splitlines())
+                               ).rstrip(',') for w in (website or '').splitlines())
         return website or None
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \

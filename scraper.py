@@ -63,11 +63,10 @@ async def scrape_person(session, semaphore, params):
     def extract_other_item(caption, link=False):
         if isinstance(caption, tuple):
             return next(filter(None, (extract_other_item(i, link) for i in caption)),
-                        None)
+                        [] if link else None)
         if link:
-            val = next(iter(source.xpath('''\
-.//td[contains(string(.), "{}")]/following-sibling::td//a/@href'''.format(
-                caption))), None)
+            val = source.xpath('''\
+.//td[contains(string(.), "{}")]/following-sibling::td//a/@href'''.format(caption))
         else:
             val = ''.join(source.xpath('''\
 string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
@@ -77,8 +76,8 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
         return val
 
     def extract_facebook():
-        facebook = (extract_other_item('FACEBOOK:', link=True) or
-                    extract_other_item('FACEBOOK:'))
+        facebook, = (extract_other_item('FACEBOOK:', link=True) or
+                     [extract_other_item('FACEBOOK:')])
         if not facebook:
             return
 
@@ -97,20 +96,19 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
             twitter = twitter.replace('https://twitter.com/', '').lstrip('@')
         return twitter
 
-    async def extract_website():
+    def extract_website():
         website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'), link=True)
-        if not website or (
-                # The `href` attribute is set to 'alvaroasthongiraldo' for
-                # several others
-                'alvaroasthongiraldo' in website):
+        if website:
+            website = ';'.join(w for w in website
+                               if not (w == '/false' or 'mailto:' in w or 
+                                       'alvaroasthongiraldo' in w))
+        else:
             website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'))
             if not website:
                 return
-            if not website.startswith('http'):
-                website = ('http://' + website).rstrip(',')
-        elif website == '/false' or 'mailto:' in website:
-                return
-        return website
+            website = ';'.join((w if w.startswith('http') else 'http://' + w
+                               ).rstrip(',') for w in website.splitlines())
+        return website or None
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \
             as profile_resp:
@@ -122,7 +120,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
             extract_other_item('FILIACIÓN POLÍTICA:'),
             '2014',
             extract_emails(),
-            (await extract_website()),
+            extract_website(),
             extract_other_item('TELÉFONO:'),
             extract_facebook(),
             extract_twitter(),

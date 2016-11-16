@@ -40,8 +40,8 @@ def deobfuscate_email(matches):
 async def scrape_person(session, semaphore, params):
     def extract_emails():
         emails = unparse_html(source).decode()
-        emails = [deobfuscate_email(m.groups())
-                  for m in email_match.finditer(emails)]
+        emails = {deobfuscate_email(m.groups())
+                  for m in email_match.finditer(emails)}
         if not emails:
             _log("Couldn't find email in " + profile_resp.url)
             return
@@ -68,9 +68,9 @@ async def scrape_person(session, semaphore, params):
             val = source.xpath('''\
 .//td[contains(string(.), "{}")]/following-sibling::td//a/@href'''.format(caption))
         else:
-            val = ''.join(source.xpath('''\
+            val = source.xpath('''\
 string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
-                caption))).strip()
+                caption)).strip()
             if not val or val.lower() in {'no tine', 'no tiene'}:
                 return
         return val
@@ -104,7 +104,7 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
         if not website:
             website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'))
             website = ';'.join((w if w.startswith('http') else 'http://' + w
-                               ).rstrip(',') for w in (website or '').splitlines())
+                                ).rstrip(',') for w in (website or '').splitlines())
         return website or None
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \

@@ -46,7 +46,7 @@ async def scrape_person(session, semaphore, params):
             _log("Couldn't find email in " + profile_resp.url)
             return
         return ';'.join(sorted(emails,
-                               key=lambda i: 0 if 'senado.gov.co' in i else 1))
+                               key=lambda i: chr(0) if 'senado.gov.co' in i else i))
 
     async def extract_photo():
         try:
@@ -99,12 +99,15 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
     def extract_website():
         website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'), link=True)
         website = ';'.join(w for w in website
-                           if not (w == '/false' or 'mailto:' in w or 
-                                   'alvaroasthongiraldo' in w))
+                           if not (w == '/false' or 'alvaroasthongiraldo' in w))
         if not website:
             website = extract_other_item(('PAGINA WEB:', 'PÁGINA WEB:'))
             website = ';'.join((w if w.startswith('http') else 'http://' + w
                                 ).rstrip(',') for w in (website or '').splitlines())
+
+        if 'correo electrónico' in website:
+            _log('Email found in {}; skipping'.format(profile_resp.url))
+            return
         return website or None
 
     async with semaphore, session.get(base_url, params=sorted(params.items())) \

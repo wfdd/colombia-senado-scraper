@@ -131,13 +131,13 @@ string(.//td[contains(string(.), "{}")]/following-sibling::td)'''.format(
 async def gather_people(session, semaphore):
     async with session.get(base_url + 'index.php/buscar-senador') as resp:
         source = parse_html(await resp.text())
-    base_params = dict((str(v) for v in i.xpath('./@name | ./@value'))
+    base_params = dict(i.xpath('./@name | ./@value')
                        for i in source.xpath('//form[@name = "ddaForm"]'
                                              '/input[@type = "hidden"]'))
     people_ids = source.xpath('//form[@name = "ddaForm"]/select[@name = "id"]'
                               '/option[position() > 1]/@value')
     people = await asyncio.gather(*(scrape_person(session, semaphore,
-                                                  {**base_params, 'id': str(i)})
+                                                  {**base_params, 'id': i})
                                     for i in people_ids), loop=loop)
     return people
 

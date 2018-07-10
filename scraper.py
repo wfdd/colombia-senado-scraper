@@ -123,7 +123,7 @@ async def gather_people():
 
 
 def main():
-    people = asyncio.run(gather_people())
+    people = asyncio.get_event_loop().run_until_complete(gather_people())
     with sqlite3.connect('data.sqlite') as cursor:
         cursor.execute('''\
 CREATE TABLE IF NOT EXISTS data
